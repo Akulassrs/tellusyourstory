@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tell Your Story</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Great+Vibes&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Tell Your Story</h1>
+  <div class="quote">"We are here to listen to your story."</div>
+  <form id="storyForm">
+    <div class="container">
+      <div class="input-section section">
+        <h2>📖 Script</h2>
+        <label for="script">Write Your Biography</label>
+        <textarea id="script" name="script" rows="5" placeholder="Start writing your story here..."></textarea>
+      </div>
+
+      <div class="input-section section">
+        <h2>🎥 Video</h2>
+        <label for="video">Upload a Video</label>
+        <input type="file" id="video" accept="video/*" />
+        <div class="progress-container"><div id="videoProgress" class="progress-bar"></div></div>
+      </div>
+
+      <div class="input-section section">
+        <h2>🎙️ Voice</h2>
+        <label for="audio">Upload a Voice Recording</label>
+        <input type="file" id="audio" accept="audio/*" />
+        <div class="progress-container"><div id="audioProgress" class="progress-bar"></div></div>
+      </div>
+
+      <div class="section">
+        <button type="submit">Submit</button>
+      </div>
+
+      <div class="preview section" id="preview"></div>
+    </div>
+  </form>
+
+  <script>
+    const cloudName = "dtvjrvxe6";
+    const uploadPreset = "tell_us_your_story";
+
+    async function uploadToCloudinary(file, progressElementId) {
+      const resourceType = file.type.startsWith("video") ? "video" : "raw";
+      const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", uploadPreset);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url, true);
+
+      return new Promise((resolve, reject) => {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = (event.loaded / event.total) * 100;
+            document.getElementById(progressElementId).style.width = percent + "%";
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.secure_url);
+          } else {
+            reject(xhr.statusText);
+          }
+        };
+
+        xhr.onerror = () => reject(xhr.statusText);
+        xhr.send(formData);
+      });
+    }
+
+    document.getElementById("storyForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const scriptText = document.getElementById("script").value;
+      const video = document.getElementById("video").files[0];
+      const audio = document.getElementById("audio").files[0];
+
+      let videoUrl = "";
+      let audioUrl = "";
+
+      try {
+        if (video) {
+          videoUrl = await uploadToCloudinary(video, "videoProgress");
+        }
+        if (audio) {
+          audioUrl = await uploadToCloudinary(audio, "audioProgress");
+        }
+
+        const formData = {
+          script: scriptText,
+          video_url: videoUrl,
+          audio_url: audioUrl
+        };
+
+        const response = await fetch("https://formspree.io/f/xqaqwoyv", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+          alert("Your story has been submitted!");
+        } else {
+          alert("Submission failed.");
+        }
+
+        const preview = document.getElementById("preview");
+        preview.innerHTML = "<h3>Your Submission Preview:</h3>";
+
+        if (scriptText) {
+          preview.innerHTML += `<div class='section'><h4>Script:</h4><p>${scriptText}</p></div>`;
+        }
+
+        if (videoUrl) {
+          preview.innerHTML += `<div class='section'><h4>Video:</h4><video src="${videoUrl}" controls></video></div>`;
+        }
+
+        if (audioUrl) {
+          preview.innerHTML += `<div class='section'><h4>Voice:</h4><audio src="${audioUrl}" controls></audio></div>`;
+        }
+
+      } catch (err) {
+        alert("An error occurred during upload.");
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
